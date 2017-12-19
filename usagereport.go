@@ -264,7 +264,7 @@ func (cmd *UsageReportCmd) setServiceFilterString() {
 
 	servicePlanFilterExpr := "?q=service_plan_guid%%20IN%%20%s"
 
-	desiredPlans := []string{"p-redis", "p-mysql"}
+	desiredPlans := []string{"p-redis", "p-mysql", "p-rabbitmq"}
 
 	services, err := cmd.getServices(desiredPlans)
 	if err != nil {
