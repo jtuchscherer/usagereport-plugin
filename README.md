@@ -1,7 +1,7 @@
 # UsageReport Plugin
 This CF CLI Plugin to shows memory consumption and application instances for each org and space you have permission to access.
 
-[![wercker status](https://app.wercker.com/status/8881b5530809e3636080d2df6433aada/s/master "wercker status")](https://app.wercker.com/project/bykey/8881b5530809e3636080d2df6433aada)
+[![Build Status](https://travis-ci.org/jtuchscherer/usagereport-plugin.svg?branch=master)](https://travis-ci.org/jtuchscherer/usagereport-plugin)
 
 
 #Usage
