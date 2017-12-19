@@ -3,8 +3,7 @@ This CF CLI Plugin to shows memory consumption and application instances for eac
 
 [![Build Status](https://travis-ci.org/jtuchscherer/usagereport-plugin.svg?branch=master)](https://travis-ci.org/jtuchscherer/usagereport-plugin)
 
-
-#Usage
+## Usage
 
 For human readable output:
 
@@ -67,15 +66,16 @@ OrgName, SpaceName, SpaceMemoryUsed, OrgMemoryQuota, AppsDeployed, AppsRunning, 
 test-org, test-space, 256, 4096, 2, 1, 3, 2
 ```
 
-##Installation
-#####Install from CLI
+## Installation
+
+### Install from CLI
   ```
   $ cf add-plugin-repo CF-Community http://plugins.cloudfoundry.org/
   $ cf install-plugin 'Usage Report' -r CF-Community
   ```
 
 
-#####Install from Source (need to have [Go](http://golang.org/dl/) installed)
+### Install from Source (need to have [Go](http://golang.org/dl/) installed)
   ```
   $ go get github.com/cloudfoundry/cli
   $ go get github.com/jtuchscherer/usagereport-plugin
