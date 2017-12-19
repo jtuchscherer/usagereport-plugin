@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 
-	"github.com/cloudfoundry/cli/plugin"
+	"code.cloudfoundry.org/cli/plugin"
 	"github.com/krujos/cfcurl"
 )
 
 var (
-	ErrOrgNotFound = errors.New("organization not found")
+	errOrgNotFound = errors.New("organization not found")
 )
 
 //Organization representation
@@ -24,8 +25,9 @@ type Organization struct {
 
 //Space representation
 type Space struct {
-	Name    string
-	AppsURL string
+	Name                 string
+	AppsURL              string
+	ServiceInstancessURL string
 }
 
 //App representation
@@ -33,6 +35,23 @@ type App struct {
 	Instances float64
 	RAM       float64
 	Running   bool
+}
+
+//App representation
+type ServiceInstance struct {
+	Name string
+}
+
+//Service representation
+type Service struct {
+	Label           string
+	ServicePlansURL string
+}
+
+//ServicePlan representation
+type ServicePlan struct {
+	GUID string
+	Name string
 }
 
 //CFAPIHelper to wrap cf curl results
@@ -43,6 +62,9 @@ type CFAPIHelper interface {
 	GetOrgMemoryUsage(Organization) (float64, error)
 	GetOrgSpaces(string) ([]Space, error)
 	GetSpaceApps(string) ([]App, error)
+	GetServices([]string) ([]Service, error)
+	GetServicePlans(string) ([]ServicePlan, error)
+	GetSpaceServiceInstances(string) ([]ServiceInstance, error)
 }
 
 //APIHelper implementation
@@ -93,7 +115,7 @@ func (api *APIHelper) GetOrg(name string) (Organization, error) {
 
 	results := int(orgsJSON["total_results"].(float64))
 	if results == 0 {
-		return Organization{}, ErrOrgNotFound
+		return Organization{}, errOrgNotFound
 	}
 
 	orgResource := orgsJSON["resources"].([]interface{})[0]
@@ -146,8 +168,9 @@ func (api *APIHelper) GetOrgSpaces(spacesURL string) ([]Space, error) {
 			entity := theSpace["entity"].(map[string]interface{})
 			spaces = append(spaces,
 				Space{
-					AppsURL: entity["apps_url"].(string),
-					Name:    entity["name"].(string),
+					AppsURL:              entity["apps_url"].(string),
+					ServiceInstancessURL: entity["service_instances_url"].(string),
+					Name:                 entity["name"].(string),
 				})
 		}
 		if next, ok := spacesJSON["next_url"].(string); ok {
@@ -174,8 +197,8 @@ func (api *APIHelper) GetSpaceApps(appsURL string) ([]App, error) {
 			apps = append(apps,
 				App{
 					Instances: entity["instances"].(float64),
-					RAM:			 entity["memory"].(float64),
-					Running:	 "STARTED" == entity["state"].(string),
+					RAM:       entity["memory"].(float64),
+					Running:   "STARTED" == entity["state"].(string),
 				})
 		}
 		if next, ok := appsJSON["next_url"].(string); ok {
@@ -185,4 +208,98 @@ func (api *APIHelper) GetSpaceApps(appsURL string) ([]App, error) {
 		}
 	}
 	return apps, nil
+}
+
+//GetSpaceServiceInstances returns the apps in a space
+func (api *APIHelper) GetSpaceServiceInstances(serviceInstancesURL string) ([]ServiceInstance, error) {
+	serviceInstances, err := processPagedResults(api.cli, serviceInstancesURL, func(metadata map[string]interface{}, entity map[string]interface{}) interface{} {
+		return ServiceInstance{
+			Name: entity["name"].(string),
+		}
+	})
+
+	retVal := make([]ServiceInstance, len(serviceInstances))
+	for i := range serviceInstances {
+		retVal[i] = serviceInstances[i].(ServiceInstance)
+	}
+
+	if nil != err {
+		return nil, err
+	}
+
+	return retVal, nil
+}
+
+//GetServices returns a struct that represents critical fields in the JSON
+func (api *APIHelper) GetServices(desiredLabels []string) ([]Service, error) {
+	queryParam := fmt.Sprintf("?q=label%%20IN%%20%s", strings.Join(desiredLabels, ","))
+	url := "/v2/services" + queryParam
+
+	services, err := processPagedResults(api.cli, url, func(metadata map[string]interface{}, entity map[string]interface{}) interface{} {
+		return Service{
+			Label:           entity["label"].(string),
+			ServicePlansURL: entity["service_plans_url"].(string),
+		}
+	})
+
+	retVal := make([]Service, len(services))
+	for i := range services {
+		retVal[i] = services[i].(Service)
+	}
+
+	if nil != err {
+		return nil, err
+	}
+
+	return retVal, nil
+}
+
+//GetServices returns a struct that represents critical fields in the JSON
+func (api *APIHelper) GetServicePlans(plansURL string) ([]ServicePlan, error) {
+	serviceplans, err := processPagedResults(api.cli, plansURL, func(metadata map[string]interface{}, entity map[string]interface{}) interface{} {
+		return ServicePlan{
+			GUID: metadata["guid"].(string),
+			Name: entity["name"].(string),
+		}
+	})
+
+	retVal := make([]ServicePlan, len(serviceplans))
+	for i := range serviceplans {
+		retVal[i] = serviceplans[i].(ServicePlan)
+	}
+
+	if nil != err {
+		return nil, err
+	}
+
+	return retVal, nil
+}
+
+//Function type to simplify processing paged results
+type process func(metadata map[string]interface{}, entity map[string]interface{}) interface{}
+
+func processPagedResults(cli plugin.CliConnection, url string, fn process) ([]interface{}, error) {
+
+	theJSON, err := cfcurl.Curl(cli, url)
+
+	if nil != err {
+		return nil, err
+	}
+
+	pages := int(theJSON["total_pages"].(float64))
+	var objects []interface{}
+	for i := 1; i <= pages; i++ {
+		if 1 != i {
+			theJSON, err = cfcurl.Curl(cli, url+"?page="+strconv.Itoa(i))
+		}
+		for _, o := range theJSON["resources"].([]interface{}) {
+			theObj := o.(map[string]interface{})
+			entity := theObj["entity"].(map[string]interface{})
+			metadata := theObj["metadata"].(map[string]interface{})
+			objects = append(objects, fn(metadata, entity))
+		}
+
+	}
+
+	return objects, nil
 }

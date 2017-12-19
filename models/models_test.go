@@ -1,11 +1,12 @@
 package models_test
 
 import (
-	. "github.com/krujos/usagereport-plugin/models"
+	. "github.com/jtuchscherer/usagereport-plugin/models"
+
+	"io/ioutil"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"io/ioutil"
 )
 
 var _ = Describe("Models", func() {
@@ -23,6 +24,11 @@ var _ = Describe("Models", func() {
 						Apps: []App{
 							App{Ram: 128, Instances: 2, Running: true},
 							App{Ram: 128, Instances: 1, Running: false},
+						},
+						ServiceInstances: []ServiceInstance{
+							ServiceInstance{Name: "my-mysql"},
+							ServiceInstance{Name: "my-redis"},
+							ServiceInstance{Name: "extra-mysql"},
 						},
 					},
 					},

@@ -15,14 +15,29 @@ type Org struct {
 }
 
 type Space struct {
-	Apps []App
-	Name string
+	Apps             []App
+	ServiceInstances []ServiceInstance
+	Name             string
 }
 
 type App struct {
 	Ram       int
 	Instances int
 	Running   bool
+}
+
+type ServiceInstance struct {
+	Name string
+}
+
+type ServicePlan struct {
+	GUID string
+	Name string
+}
+
+type Service struct {
+	Label string
+	Plans []ServicePlan
 }
 
 type Report struct {
@@ -35,6 +50,14 @@ func (org *Org) InstancesCount() int {
 		instancesCount += space.InstancesCount()
 	}
 	return instancesCount
+}
+
+func (org *Org) ServiceInstancesCount() int {
+	serviceInstancesCount := 0
+	for _, space := range org.Spaces {
+		serviceInstancesCount += len(space.ServiceInstances)
+	}
+	return serviceInstancesCount
 }
 
 func (org *Org) AppsCount() int {
@@ -88,6 +111,7 @@ func (report *Report) String() string {
 
 	totalApps := 0
 	totalInstances := 0
+	totalServiceInstances := 0
 
 	for _, org := range report.Orgs {
 		response.WriteString(fmt.Sprintf("Org %s is consuming %d MB of %d MB.\n",
@@ -98,6 +122,7 @@ func (report *Report) String() string {
 			spaceInstancesCount := space.InstancesCount()
 			spaceRunningInstancesCount := space.RunningInstancesCount()
 			spaceConsumedMemory := space.ConsumedMemory()
+			spaceServiceInstanceCount := len(space.ServiceInstances)
 
 			response.WriteString(
 				fmt.Sprintf("\tSpace %s is consuming %d MB memory (%d%%) of org quota.\n",
@@ -108,15 +133,18 @@ func (report *Report) String() string {
 			response.WriteString(
 				fmt.Sprintf("\t\t%d instances: %d running, %d stopped\n", spaceInstancesCount,
 					spaceRunningInstancesCount, spaceInstancesCount-spaceRunningInstancesCount))
+			response.WriteString(
+				fmt.Sprintf("\t\t%d service instances\n", spaceServiceInstanceCount))
 		}
 
 		totalApps += org.AppsCount()
 		totalInstances += org.InstancesCount()
+		totalServiceInstances += org.ServiceInstancesCount()
 	}
 
 	response.WriteString(
-		fmt.Sprintf("You are running %d apps in %d org(s), with a total of %d instances.\n",
-			totalApps, len(report.Orgs), totalInstances))
+		fmt.Sprintf("You are running %d apps in %d org(s), with a total of %d instances and %d service instances.\n",
+			totalApps, len(report.Orgs), totalInstances, totalServiceInstances))
 
 	return response.String()
 }
@@ -125,7 +153,7 @@ func (report *Report) CSV() string {
 	var rows = [][]string{}
 	var csv bytes.Buffer
 
-	var headers = []string{"OrgName", "SpaceName", "SpaceMemoryUsed", "OrgMemoryQuota", "AppsDeployed", "AppsRunning", "AppInstancesDeployed", "AppInstancesRunning"}
+	var headers = []string{"OrgName", "SpaceName", "SpaceMemoryUsed", "OrgMemoryQuota", "AppsDeployed", "AppsRunning", "AppInstancesDeployed", "AppInstancesRunning, ServiceInstances"}
 
 	rows = append(rows, headers)
 
@@ -142,6 +170,7 @@ func (report *Report) CSV() string {
 				strconv.Itoa(space.RunningAppsCount()),
 				strconv.Itoa(space.InstancesCount()),
 				strconv.Itoa(space.RunningInstancesCount()),
+				strconv.Itoa(len(space.ServiceInstances)),
 			}
 
 			rows = append(rows, spaceResult)

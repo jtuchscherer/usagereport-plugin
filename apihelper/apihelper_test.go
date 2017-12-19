@@ -5,7 +5,7 @@ import (
 	"errors"
 	"os"
 
-	"github.com/cloudfoundry/cli/plugin/fakes"
+	"code.cloudfoundry.org/cli/plugin/pluginfakes"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -23,10 +23,10 @@ func slurp(filename string) []string {
 
 var _ = Describe("UsageReport", func() {
 	var api CFAPIHelper
-	var fakeCliConnection *fakes.FakeCliConnection
+	var fakeCliConnection *pluginfakes.FakeCliConnection
 
 	BeforeEach(func() {
-		fakeCliConnection = &fakes.FakeCliConnection{}
+		fakeCliConnection = &pluginfakes.FakeCliConnection{}
 		api = New(fakeCliConnection)
 	})
 

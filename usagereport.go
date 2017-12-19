@@ -4,15 +4,20 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
-	"github.com/cloudfoundry/cli/plugin"
-	"github.com/krujos/usagereport-plugin/apihelper"
-	"github.com/krujos/usagereport-plugin/models"
+	"code.cloudfoundry.org/cli/cf/terminal"
+	"code.cloudfoundry.org/cli/cf/trace"
+	"code.cloudfoundry.org/cli/plugin"
+	"github.com/jtuchscherer/usagereport-plugin/apihelper"
+	"github.com/jtuchscherer/usagereport-plugin/models"
 )
 
 //UsageReportCmd the plugin
 type UsageReportCmd struct {
-	apiHelper apihelper.CFAPIHelper
+	apiHelper         apihelper.CFAPIHelper
+	ui                terminal.UI
+	servicePlanFilter string
 }
 
 // contains CLI flag values
@@ -45,8 +50,8 @@ func (cmd *UsageReportCmd) GetMetadata() plugin.PluginMetadata {
 		Name: "usage-report",
 		Version: plugin.VersionType{
 			Major: 1,
-			Minor: 4,
-			Build: 1,
+			Minor: 5,
+			Build: 0,
 		},
 		Commands: []plugin.Command{
 			{
@@ -66,11 +71,20 @@ func (cmd *UsageReportCmd) GetMetadata() plugin.PluginMetadata {
 
 //UsageReportCommand doer
 func (cmd *UsageReportCmd) UsageReportCommand(args []string) {
+	if args[0] != "usage-report" {
+		return
+	}
+
+	traceLogger := trace.NewLogger(os.Stdout, true, os.Getenv("CF_TRACE"), "")
+	cmd.ui = terminal.NewUI(os.Stdin, os.Stdout, terminal.NewTeePrinter(os.Stdout), traceLogger)
+
 	flagVals := ParseFlags(args)
 
 	var orgs []models.Org
 	var err error
 	var report models.Report
+
+	cmd.setServiceFilterString()
 
 	if flagVals.OrgName != "" {
 		org, err := cmd.getOrg(flagVals.OrgName)
@@ -156,10 +170,17 @@ func (cmd *UsageReportCmd) getSpaces(spaceURL string) ([]models.Space, error) {
 		if nil != err {
 			return nil, err
 		}
+
+		serviceInstances, err := cmd.getServiceInstances(s.ServiceInstancessURL)
+		if nil != err {
+			return nil, err
+		}
+
 		spaces = append(spaces,
 			models.Space{
-				Apps: apps,
-				Name: s.Name,
+				Apps:             apps,
+				ServiceInstances: serviceInstances,
+				Name:             s.Name,
 			},
 		)
 	}
@@ -180,6 +201,85 @@ func (cmd *UsageReportCmd) getApps(appsURL string) ([]models.App, error) {
 		})
 	}
 	return apps, nil
+}
+
+func (cmd *UsageReportCmd) getServiceInstances(serviceInstancesURL string) ([]models.ServiceInstance, error) {
+	url := serviceInstancesURL + cmd.servicePlanFilter
+
+	rawServiceInstances, err := cmd.apiHelper.GetSpaceServiceInstances(url)
+	if nil != err {
+		return nil, err
+	}
+	var serviceInstances = []models.ServiceInstance{}
+	for _, si := range rawServiceInstances {
+		serviceInstances = append(serviceInstances, models.ServiceInstance{
+			Name: si.Name,
+		})
+	}
+	return serviceInstances, nil
+}
+
+func (cmd *UsageReportCmd) getServices(desiredLabels []string) ([]models.Service, error) {
+	rawServices, err := cmd.apiHelper.GetServices(desiredLabels)
+	if nil != err {
+		return nil, err
+	}
+
+	var services = []models.Service{}
+
+	for _, s := range rawServices {
+
+		serviceplans, err := cmd.getServicePlans(s.ServicePlansURL)
+		if nil != err {
+			return nil, err
+		}
+
+		services = append(services, models.Service{
+			Label: s.Label,
+			Plans: serviceplans,
+		})
+	}
+	return services, nil
+}
+
+func (cmd *UsageReportCmd) getServicePlans(servicePlansURL string) ([]models.ServicePlan, error) {
+	rawServicePlans, err := cmd.apiHelper.GetServicePlans(servicePlansURL)
+	if nil != err {
+		return nil, err
+	}
+
+	var serviceplans = []models.ServicePlan{}
+
+	for _, sp := range rawServicePlans {
+
+		serviceplans = append(serviceplans, models.ServicePlan{
+			GUID: sp.GUID,
+			Name: sp.Name,
+		})
+	}
+	return serviceplans, nil
+}
+
+func (cmd *UsageReportCmd) setServiceFilterString() {
+
+	servicePlanFilterExpr := "?q=service_plan_guid%%20IN%%20%s"
+
+	desiredPlans := []string{"p-redis", "p-mysql"}
+
+	services, err := cmd.getServices(desiredPlans)
+	if err != nil {
+		cmd.ui.Failed("Sorry, could not retrieve service listing")
+		return
+	}
+
+	var planGUIDs []string
+	for _, service := range services {
+		for _, plan := range service.Plans {
+			planGUIDs = append(planGUIDs, plan.GUID)
+		}
+	}
+
+	cmd.servicePlanFilter = fmt.Sprintf(servicePlanFilterExpr, strings.Join(planGUIDs, ","))
 }
 
 //Run runs the plugin

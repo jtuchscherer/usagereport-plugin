@@ -78,8 +78,8 @@ test-org, test-space, 256, 4096, 2, 1, 3, 2
 #####Install from Source (need to have [Go](http://golang.org/dl/) installed)
   ```
   $ go get github.com/cloudfoundry/cli
-  $ go get github.com/krujos/usagereport-plugin
-  $ cd $GOPATH/src/github.com/krujos/usagereport-plugin
+  $ go get github.com/jtuchscherer/usagereport-plugin
+  $ cd $GOPATH/src/github.com/jtuchscherer/usagereport-plugin
   $ go build
   $ cf install-plugin usagereport-plugin
   ```

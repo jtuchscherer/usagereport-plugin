@@ -3,19 +3,19 @@ package main
 import (
 	"errors"
 
-	"github.com/krujos/usagereport-plugin/apihelper"
-	"github.com/krujos/usagereport-plugin/apihelper/fakes"
+	"github.com/jtuchscherer/usagereport-plugin/apihelper"
+	"github.com/jtuchscherer/usagereport-plugin/apihelper/apihelperfakes"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Usagereport", func() {
-	var fakeAPI *fakes.FakeCFAPIHelper
+	var fakeAPI *apihelperfakes.FakeCFAPIHelper
 	var cmd *UsageReportCmd
 
 	BeforeEach(func() {
-		fakeAPI = &fakes.FakeCFAPIHelper{}
+		fakeAPI = &apihelperfakes.FakeCFAPIHelper{}
 		cmd = &UsageReportCmd{apiHelper: fakeAPI}
 	})
 
